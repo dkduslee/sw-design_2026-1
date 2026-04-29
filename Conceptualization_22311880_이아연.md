@@ -1,6 +1,6 @@
 # 1. Conceptualization
 
-![logo](./img/logo.jpeg)
+![logo](./img/logo.png)
 > 3교대 근무자를 위한 알람·캘린더 연동 앱 🗓️
 
 | | |
@@ -16,7 +16,7 @@
 | Revision date | Version # | Description | Author |
 |---|---|---|---|
 | 2026.03.21 | 1.0.0 | First Draft | |
-| | | | |
+| 2026.04.28 | 1.0.1 | Logo modify | |
 | | | | |
 
 ---
