@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import '../models/shift_type.dart';
+import '../models/schedule_category.dart';
 
 class ShiftDialog extends StatefulWidget {
   final DateTime date;
-  final ShiftType? initialType;
+  final ScheduleCategory? initialCategory;
   final String? initialMemo;
-  final void Function(ShiftType type, String? memo) onConfirm;
+  final List<ScheduleCategory> categories;
+  final void Function(ScheduleCategory category, String? memo) onConfirm;
 
   const ShiftDialog({
     super.key,
     required this.date,
-    this.initialType,
+    required this.categories,
+    this.initialCategory,
     this.initialMemo,
     required this.onConfirm,
   });
@@ -20,13 +22,13 @@ class ShiftDialog extends StatefulWidget {
 }
 
 class _ShiftDialogState extends State<ShiftDialog> {
-  ShiftType? _selected;
+  ScheduleCategory? _selected;
   final _memoController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.initialType;
+    _selected = widget.initialCategory;
     _memoController.text = widget.initialMemo ?? '';
   }
 
@@ -41,62 +43,57 @@ class _ShiftDialogState extends State<ShiftDialog> {
     final dateStr = '${widget.date.month}월 ${widget.date.day}일';
 
     return AlertDialog(
-      title: Text('$dateStr 근무 등록'),
+      title: Text('$dateStr 일정 등록'),
       content: SizedBox(
         width: double.maxFinite,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('근무 유형 선택',
+            const Text('카테고리 선택',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
-            // 근무 유형 버튼들
-            Row(
-              children: ShiftType.values.map((type) {
-                final isSelected = _selected == type;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selected = type),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? type.color
-                              : type.color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isSelected
-                                ? type.color
-                                : type.color.withOpacity(0.3),
-                            width: isSelected ? 2 : 1,
+            // 카테고리 버튼들 (2줄 그리드)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.categories.map((cat) {
+                final isSelected = _selected?.id == cat.id;
+                return GestureDetector(
+                  onTap: () => setState(() => _selected = cat),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? cat.color
+                          : cat.color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected
+                            ? cat.color
+                            : cat.color.withOpacity(0.3),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(cat.emoji,
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 6),
+                        Text(
+                          cat.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected ? Colors.white : cat.color,
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            Text(
-                              _typeIcon(type),
-                              style: const TextStyle(fontSize: 20),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              type.name,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? Colors.white
-                                    : type.color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ),
                   ),
                 );
@@ -123,9 +120,9 @@ class _ShiftDialogState extends State<ShiftDialog> {
                   const Icon(Icons.alarm, size: 14, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(
-                    '기본 알람: ${_selected!.defaultAlarmTime.format(context)}',
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.grey),
+                    '기본 알람: ${_selected!.alarmTime.format(context)}',
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
@@ -153,18 +150,5 @@ class _ShiftDialogState extends State<ShiftDialog> {
         ),
       ],
     );
-  }
-
-  String _typeIcon(ShiftType type) {
-    switch (type) {
-      case ShiftType.day:
-        return '☀️';
-      case ShiftType.night:
-        return '🌙';
-      case ShiftType.off:
-        return '😴';
-      case ShiftType.holiday:
-        return '🏖️';
-    }
   }
 }

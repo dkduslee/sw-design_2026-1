@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import '../models/shift_type.dart';
+import '../models/schedule_category.dart';
 
 class RepeatPatternDialog extends StatefulWidget {
   final DateTime startDate;
-  final void Function(DateTime start, List<ShiftType> pattern, int weeks)
-      onConfirm;
+  final List<ScheduleCategory> categories;
+  final void Function(
+      DateTime start, List<ScheduleCategory> pattern, int weeks) onConfirm;
 
   const RepeatPatternDialog({
     super.key,
     required this.startDate,
+    required this.categories,
     required this.onConfirm,
   });
 
@@ -17,13 +19,7 @@ class RepeatPatternDialog extends StatefulWidget {
 }
 
 class _RepeatPatternDialogState extends State<RepeatPatternDialog> {
-  // 기본 패턴: 주야비휴
-  List<ShiftType> _pattern = [
-    ShiftType.day,
-    ShiftType.night,
-    ShiftType.off,
-    ShiftType.holiday,
-  ];
+  List<ScheduleCategory> _pattern = [];
   int _weeks = 4;
   DateTime? _startDate;
 
@@ -31,6 +27,8 @@ class _RepeatPatternDialogState extends State<RepeatPatternDialog> {
   void initState() {
     super.initState();
     _startDate = widget.startDate;
+    // 기본 패턴: 카테고리 앞 4개
+    _pattern = widget.categories.take(4).toList();
   }
 
   @override
@@ -60,61 +58,63 @@ class _RepeatPatternDialogState extends State<RepeatPatternDialog> {
             const Text('패턴 순서',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 8),
-            // 패턴 편집 (드래그 가능)
-            ReorderableListView(
-              shrinkWrap: true,
-              onReorder: (oldIdx, newIdx) {
-                setState(() {
-                  if (newIdx > oldIdx) newIdx--;
-                  final item = _pattern.removeAt(oldIdx);
-                  _pattern.insert(newIdx, item);
-                });
-              },
-              children: [
-                for (int i = 0; i < _pattern.length; i++)
-                  ListTile(
-                    key: ValueKey(_pattern[i].dbValue + i.toString()),
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: _pattern[i].color.withOpacity(0.15),
-                      child: Text(
-                        '${i + 1}',
-                        style: TextStyle(
-                            color: _pattern[i].color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold),
+            // 현재 패턴
+            if (_pattern.isEmpty)
+              const Text('아래에서 카테고리를 추가하세요',
+                  style: TextStyle(color: Colors.grey, fontSize: 12))
+            else
+              ReorderableListView(
+                shrinkWrap: true,
+                onReorder: (oldIdx, newIdx) {
+                  setState(() {
+                    if (newIdx > oldIdx) newIdx--;
+                    final item = _pattern.removeAt(oldIdx);
+                    _pattern.insert(newIdx, item);
+                  });
+                },
+                children: [
+                  for (int i = 0; i < _pattern.length; i++)
+                    ListTile(
+                      key: ValueKey('$i-${_pattern[i].id}'),
+                      dense: true,
+                      leading: Text('${_pattern[i].emoji}',
+                          style: const TextStyle(fontSize: 20)),
+                      title: Text(_pattern[i].name),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.drag_handle, color: Colors.grey),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16),
+                            onPressed: () =>
+                                setState(() => _pattern.removeAt(i)),
+                          ),
+                        ],
                       ),
                     ),
-                    title: Text(_pattern[i].name),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.drag_handle, color: Colors.grey),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 16),
-                          onPressed: _pattern.length > 1
-                              ? () => setState(() => _pattern.removeAt(i))
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            // 추가 버튼
+                ],
+              ),
+            const SizedBox(height: 8),
+            // 카테고리 추가 칩
+            const Text('추가할 카테고리',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 4),
             Wrap(
               spacing: 6,
-              children: ShiftType.values.map((type) {
+              runSpacing: 4,
+              children: widget.categories.map((cat) {
                 return ActionChip(
-                  label: Text(type.name, style: const TextStyle(fontSize: 11)),
-                  backgroundColor: type.color.withOpacity(0.1),
-                  onPressed: () => setState(() => _pattern.add(type)),
+                  avatar: Text(cat.emoji),
+                  label: Text(cat.name,
+                      style: const TextStyle(fontSize: 11)),
+                  backgroundColor: cat.color.withOpacity(0.1),
+                  side: BorderSide(color: cat.color.withOpacity(0.3)),
+                  onPressed: () => setState(() => _pattern.add(cat)),
                 );
               }).toList(),
             ),
             const SizedBox(height: 12),
-            // 주 수 선택
+            // 주 수
             Row(
               children: [
                 const Text('적용 기간: ', style: TextStyle(fontSize: 14)),
@@ -122,7 +122,8 @@ class _RepeatPatternDialogState extends State<RepeatPatternDialog> {
                   value: _weeks,
                   underline: const SizedBox(),
                   items: [1, 2, 4, 8, 12].map((w) {
-                    return DropdownMenuItem(value: w, child: Text('$w주'));
+                    return DropdownMenuItem(
+                        value: w, child: Text('$w주'));
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) setState(() => _weeks = val);
@@ -138,10 +139,13 @@ class _RepeatPatternDialogState extends State<RepeatPatternDialog> {
             onPressed: () => Navigator.pop(context),
             child: const Text('취소')),
         FilledButton(
-          onPressed: () {
-            Navigator.pop(context);
-            widget.onConfirm(_startDate!, List.from(_pattern), _weeks);
-          },
+          onPressed: _pattern.isEmpty
+              ? null
+              : () {
+                  Navigator.pop(context);
+                  widget.onConfirm(
+                      _startDate!, List.from(_pattern), _weeks);
+                },
           child: const Text('적용'),
         ),
       ],

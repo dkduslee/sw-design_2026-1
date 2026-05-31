@@ -1,7 +1,7 @@
 import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter/material.dart';
-import '../models/shift_schedule.dart';
-import '../models/shift_type.dart';
+import '../models/schedule_entry.dart';
+import '../models/schedule_category.dart';
 
 class CalendarManager {
   static final CalendarManager _instance = CalendarManager._internal();
@@ -18,94 +18,77 @@ class CalendarManager {
 
   Future<bool> _ensureCalendar() async {
     if (_calendarId != null) return true;
-
     final hasPermission = await requestPermissions();
     if (!hasPermission) return false;
 
     final calendarsResult = await _deviceCalendar.retrieveCalendars();
-    if (!calendarsResult.isSuccess || calendarsResult.data == null) {
-      return false;
-    }
+    if (!calendarsResult.isSuccess || calendarsResult.data == null) return false;
 
-    // My Timer 전용 캘린더 찾기 (없으면 기본 캘린더 사용)
     final calendars = calendarsResult.data!;
-    final myTimerCal = calendars.firstWhere(
+    final cal = calendars.firstWhere(
       (c) => c.name == 'My Timer',
       orElse: () => calendars.first,
     );
-    _calendarId = myTimerCal.id;
+    _calendarId = cal.id;
     return true;
   }
 
-  Future<String?> createEvent(ShiftSchedule schedule) async {
+  Future<String?> createEntryEvent(
+      ScheduleEntry entry, ScheduleCategory category) async {
     try {
       final ready = await _ensureCalendar();
       if (!ready || _calendarId == null) return null;
 
-      final date = schedule.date;
-      final startHour = schedule.shiftType.startTime.hour;
-      final startMin = schedule.shiftType.startTime.minute;
-      final endHour = schedule.shiftType.endTime.hour;
-      final endMin = schedule.shiftType.endTime.minute;
+      final date = entry.date;
+      final alarmHour = category.alarmTime.hour;
+      final alarmMin = category.alarmTime.minute;
 
-      final startTime = TZDateTime.local(
-          date.year, date.month, date.day, startHour, startMin);
-      final endTime = schedule.shiftType == ShiftType.night
-          ? TZDateTime.local(
-              date.year, date.month, date.day + 1, endHour, endMin)
-          : TZDateTime.local(
-              date.year, date.month, date.day, endHour, endMin);
+      final startTime =
+          TZDateTime.local(date.year, date.month, date.day, alarmHour, alarmMin);
+      final endTime = startTime.add(const Duration(hours: 1));
 
       final event = Event(
         _calendarId,
-        title: '[${schedule.shiftType.name}] 근무',
+        title: '[${category.emoji}] ${category.name}',
         start: startTime,
         end: endTime,
-        description: schedule.memo,
+        description: entry.memo,
       );
 
-      final result =
-          await _deviceCalendar.createOrUpdateEvent(event);
-      if (result?.isSuccess == true) {
-        return result!.data;
-      }
+      final result = await _deviceCalendar.createOrUpdateEvent(event);
+      if (result?.isSuccess == true) return result!.data;
     } catch (e) {
-      debugPrint('CalendarManager.createEvent error: $e');
+      debugPrint('CalendarManager.createEntryEvent error: $e');
     }
     return null;
   }
 
-  Future<void> updateEvent(ShiftSchedule schedule) async {
-    if (schedule.calendarEventId == null) {
-      await createEvent(schedule);
+  Future<void> updateEntryEvent(
+      ScheduleEntry entry, ScheduleCategory category) async {
+    if (entry.calendarEventId == null) {
+      await createEntryEvent(entry, category);
       return;
     }
     try {
       final ready = await _ensureCalendar();
       if (!ready || _calendarId == null) return;
 
-      final date = schedule.date;
-      final startHour = schedule.shiftType.startTime.hour;
-      final startMin = schedule.shiftType.startTime.minute;
-      final endHour = schedule.shiftType.endTime.hour;
-      final endMin = schedule.shiftType.endTime.minute;
-
-      final startTime = TZDateTime.local(
-          date.year, date.month, date.day, startHour, startMin);
-      final endTime = TZDateTime.local(
-          date.year, date.month, date.day, endHour, endMin);
+      final date = entry.date;
+      final startTime = TZDateTime.local(date.year, date.month, date.day,
+          category.alarmTime.hour, category.alarmTime.minute);
+      final endTime = startTime.add(const Duration(hours: 1));
 
       final event = Event(
         _calendarId,
-        eventId: schedule.calendarEventId,
-        title: '[${schedule.shiftType.name}] 근무',
+        eventId: entry.calendarEventId,
+        title: '[${category.emoji}] ${category.name}',
         start: startTime,
         end: endTime,
-        description: schedule.memo,
+        description: entry.memo,
       );
       await _deviceCalendar.createOrUpdateEvent(event);
     } catch (e) {
-      debugPrint('CalendarManager.updateEvent error: $e');
+      debugPrint('CalendarManager.updateEntryEvent error: $e');
     }
   }
 

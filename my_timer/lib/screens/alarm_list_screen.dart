@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/alarm_setting.dart';
-import '../models/shift_type.dart';
+import '../models/schedule_category.dart';
 import '../services/schedule_manager.dart';
 import '../services/alarm_manager.dart';
 import '../services/schedule_provider.dart';
@@ -22,7 +22,6 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
   void initState() {
     super.initState();
     _loadAlarms();
-    // ScheduleProvider 변경 시 자동 갱신
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ScheduleProvider>().addListener(_loadAlarms);
     });
@@ -41,7 +40,6 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ScheduleProvider 변경을 감지해서 자동 리빌드
     context.watch<ScheduleProvider>();
 
     final upcoming = _alarms
@@ -91,13 +89,11 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
         children: [
           Icon(Icons.alarm_off, size: 64, color: Colors.grey.shade400),
           const SizedBox(height: 16),
-          Text(
-            '등록된 알람이 없습니다.',
-            style: TextStyle(color: Colors.grey.shade600),
-          ),
+          Text('등록된 알람이 없습니다.',
+              style: TextStyle(color: Colors.grey.shade600)),
           const SizedBox(height: 8),
           Text(
-            '캘린더에서 근무 유형을 등록하면\n자동으로 알람이 생성됩니다.',
+            '캘린더에서 일정을 등록하면\n자동으로 알람이 생성됩니다.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
@@ -135,20 +131,29 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     final dateStr = '${time.month}월 ${time.day}일';
 
-    ShiftType? type;
-    for (final t in ShiftType.values) {
-      if (alarm.message.contains(t.name)) {
-        type = t;
-        break;
-      }
+    // 메시지에서 카테고리 이름 추출 (첫 번째 공백 이전)
+    final categoryName = alarm.message.split(' ').first;
+
+    // ScheduleProvider에서 카테고리 색상 찾기
+    final provider = context.read<ScheduleProvider>();
+    ScheduleCategory? category;
+    try {
+      category = provider.categories
+          .firstWhere((c) => alarm.message.contains(c.name));
+    } catch (_) {
+      category = null;
     }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: (type?.color ?? Colors.grey).withOpacity(0.15),
-          child: Icon(Icons.alarm, color: type?.color ?? Colors.grey),
+          backgroundColor:
+              (category?.color ?? Colors.grey).withOpacity(0.15),
+          child: Text(
+            category?.emoji ?? '⏰',
+            style: const TextStyle(fontSize: 18),
+          ),
         ),
         title: Row(
           children: [
@@ -158,23 +163,23 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: isUpcoming
-                    ? Theme.of(context).colorScheme.primary
+                    ? const Color(0xFFFF7043)
                     : Colors.grey,
               ),
             ),
             const SizedBox(width: 8),
-            if (type != null)
+            if (category != null)
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: type.color.withOpacity(0.15),
+                  color: category.color.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  type.name,
+                  '${category.emoji} ${category.name}',
                   style: TextStyle(
-                    color: type.color,
+                    color: category.color,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),

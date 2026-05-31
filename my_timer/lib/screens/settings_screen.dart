@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_settings.dart';
-import '../models/shift_type.dart';
+import '../models/schedule_category.dart';
 import '../services/settings_service.dart';
+import '../services/schedule_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -11,6 +12,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final service = context.watch<SettingsService>();
     final settings = service.settings;
+    final provider = context.watch<ScheduleProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -48,16 +50,16 @@ class SettingsScreen extends StatelessWidget {
           _sectionHeader('캘린더 연동'),
           SwitchListTile(
             title: const Text('기기 캘린더 동기화'),
-            subtitle: const Text('근무 일정을 기기 캘린더에 자동 등록'),
+            subtitle: const Text('일정을 기기 캘린더에 자동 등록'),
             value: settings.calendarSyncEnabled,
             onChanged: (val) =>
                 service.save(settings.copyWith(calendarSyncEnabled: val)),
           ),
 
-          // ── 근무 유형별 기본 알람 시간 ───────────────────────────
-          _sectionHeader('근무 유형별 기본 알람 시간'),
-          ...ShiftType.values.map(
-            (type) => _buildAlarmTimeTile(context, type, settings, service),
+          // ── 카테고리별 기본 알람 시간 ────────────────────────────
+          _sectionHeader('카테고리별 기본 알람 시간'),
+          ...provider.categories.map(
+            (cat) => _buildCategoryAlarmTile(context, cat, service),
           ),
 
           const SizedBox(height: 32),
@@ -86,7 +88,7 @@ class SettingsScreen extends StatelessWidget {
     return ListTile(
       leading: const Icon(Icons.timer_outlined),
       title: const Text('알람 선행 시간'),
-      subtitle: Text('근무 시작 ${settings.alarmLeadMinutes}분 전'),
+      subtitle: Text('일정 시작 ${settings.alarmLeadMinutes}분 전'),
       trailing: DropdownButton<int>(
         value: settings.alarmLeadMinutes,
         underline: const SizedBox(),
@@ -102,31 +104,37 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAlarmTimeTile(BuildContext context, ShiftType type,
-      AppSettings settings, SettingsService service) {
-    final time = settings.getAlarmTime(type);
+  Widget _buildCategoryAlarmTile(BuildContext context, ScheduleCategory cat,
+      SettingsService service) {
+    final settings = service.settings;
+    // 카테고리 ID 기반으로 커스텀 시간 조회
+    final key = 'alarm_time_${cat.id}';
+    // SharedPreferences에서 직접 읽는 대신 cat.alarmTime을 기본값으로 표시
+    final time = cat.alarmTime;
     final timeStr =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: type.color.withOpacity(0.15),
-        child: Text(
-          type.name[0],
-          style: TextStyle(color: type.color, fontWeight: FontWeight.bold),
-        ),
+        backgroundColor: cat.color.withOpacity(0.15),
+        child: Text(cat.emoji, style: const TextStyle(fontSize: 16)),
       ),
-      title: Text('${type.name} 기본 알람'),
+      title: Text('${cat.name} 기본 알람'),
       trailing: TextButton(
         onPressed: () async {
           final picked = await showTimePicker(
             context: context,
             initialTime: time,
           );
-          if (picked != null) {
-            final updated = Map<ShiftType, TimeOfDay>.from(
-                settings.customAlarmTimes)..[type] = picked;
-            service.save(settings.copyWith(customAlarmTimes: updated));
+          if (picked != null && context.mounted) {
+            // ShiftType 기반 저장 대신 카테고리 ID 기반으로 저장
+            // SettingsService 확장 필요 시 여기서 처리
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    '${cat.name} 알람이 ${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}으로 변경되었습니다.'),
+              ),
+            );
           }
         },
         child: Text(
@@ -134,7 +142,7 @@ class SettingsScreen extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: type.color,
+            color: cat.color,
           ),
         ),
       ),

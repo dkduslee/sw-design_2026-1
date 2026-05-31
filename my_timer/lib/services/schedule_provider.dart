@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import '../models/shift_schedule.dart';
-import '../models/shift_type.dart';
+import '../models/schedule_entry.dart';
+import '../models/schedule_category.dart';
 import '../services/schedule_manager.dart';
 import '../services/sync_service.dart';
+import '../services/category_manager.dart';
 
 class ScheduleProvider extends ChangeNotifier {
   final ScheduleManager _manager = ScheduleManager();
   final SyncService _sync = SyncService();
+  final CategoryManager _catManager = CategoryManager();
 
-  Map<DateTime, ShiftSchedule> scheduleMap = {};
-  List<ShiftSchedule> _monthSchedules = [];
+  Map<DateTime, ScheduleEntry> entryMap = {};
+  List<ScheduleCategory> categories = [];
 
   DateTime _focusedMonth = DateTime.now();
   DateTime get focusedMonth => _focusedMonth;
@@ -20,50 +22,96 @@ class ScheduleProvider extends ChangeNotifier {
   }
 
   Future<void> loadMonth(int year, int month) async {
-    _monthSchedules = await _manager.getSchedulesByMonth(year, month);
-    scheduleMap = {
-      for (final s in _monthSchedules)
-        DateTime(s.date.year, s.date.month, s.date.day): s
+    // DB 초기화 보장
+    await _manager.database;
+
+    final entries = await _manager.getEntriesByMonth(year, month);
+    entryMap = {
+      for (final e in entries)
+        DateTime(e.date.year, e.date.month, e.date.day): e
     };
+    categories = await _catManager.getAll();
     notifyListeners();
   }
 
-  ShiftSchedule? getSchedule(DateTime day) {
-    return scheduleMap[DateTime(day.year, day.month, day.day)];
+  Future<void> loadCategories() async {
+    await _manager.database;
+    categories = await _catManager.getAll();
+    notifyListeners();
   }
 
-  Future<void> addSchedule(DateTime date, ShiftType type, {String? memo}) async {
-    final schedule = ShiftSchedule(date: date, shiftType: type, memo: memo);
-    final id = await _manager.insertSchedule(schedule);
-    final saved = schedule.copyWith(id: id);
-    await _sync.syncOnCreate(saved);
+  ScheduleEntry? getEntry(DateTime day) {
+    return entryMap[DateTime(day.year, day.month, day.day)];
+  }
+
+  ScheduleCategory? getCategoryById(int id) {
+    try {
+      return categories.firstWhere((c) => c.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── 스케줄 등록 ─────────────────────────────────────────────────────
+
+  Future<void> addEntry(
+      DateTime date, ScheduleCategory category, {String? memo}) async {
+    final entry = ScheduleEntry(
+      date: date,
+      categoryId: category.id!,
+      categoryName: category.name,
+      memo: memo,
+    );
+    final id = await _manager.insertEntry(entry);
+    final saved = entry.copyWith(id: id);
+    await _sync.syncOnCreate(saved, category);
     await loadMonth(date.year, date.month);
   }
 
-  Future<void> editSchedule(ShiftSchedule old, ShiftType newType,
-      {String? memo}) async {
-    final updated = old.copyWith(shiftType: newType, memo: memo);
-    await _manager.updateSchedule(updated);
-    await _sync.syncOnUpdate(updated);
+  // ── 스케줄 수정 ─────────────────────────────────────────────────────
+
+  Future<void> editEntry(
+      ScheduleEntry old, ScheduleCategory category, {String? memo}) async {
+    final updated = old.copyWith(
+      categoryId: category.id!,
+      categoryName: category.name,
+      memo: memo,
+    );
+    await _manager.updateEntry(updated);
+    await _sync.syncOnUpdate(updated, category);
     await loadMonth(old.date.year, old.date.month);
   }
 
-  Future<void> removeSchedule(ShiftSchedule schedule) async {
-    await _sync.syncOnDelete(schedule);
-    if (schedule.id != null) await _manager.deleteSchedule(schedule.id!);
-    await loadMonth(schedule.date.year, schedule.date.month);
+  // ── 스케줄 삭제 ─────────────────────────────────────────────────────
+
+  Future<void> removeEntry(ScheduleEntry entry) async {
+    await _sync.syncOnDelete(entry);
+    if (entry.id != null) await _manager.deleteEntry(entry.id!);
+    await loadMonth(entry.date.year, entry.date.month);
   }
 
-  /// 반복 패턴 적용
+  // ── 반복 패턴 ───────────────────────────────────────────────────────
+
   Future<void> applyRepeatPattern(
-      DateTime startDate, List<ShiftType> pattern, int weeks) async {
+      DateTime startDate, List<ScheduleCategory> pattern, int weeks) async {
     await _manager.applyRepeatPattern(startDate, pattern, weeks);
-    // 생성된 각 스케줄에 대해 sync (간단히 month reload 후 일괄 sync)
-    final schedules = await _manager.getSchedulesByMonth(
-        startDate.year, startDate.month);
-    for (final s in schedules) {
-      if (s.id != null) await _sync.syncOnCreate(s);
-    }
     await loadMonth(startDate.year, startDate.month);
+  }
+
+  // ── 카테고리 관리 ────────────────────────────────────────────────────
+
+  Future<void> addCategory(ScheduleCategory category) async {
+    await _catManager.insert(category);
+    await loadCategories();
+  }
+
+  Future<void> updateCategory(ScheduleCategory category) async {
+    await _catManager.update(category);
+    await loadCategories();
+  }
+
+  Future<void> deleteCategory(int id) async {
+    await _catManager.delete(id);
+    await loadCategories();
   }
 }

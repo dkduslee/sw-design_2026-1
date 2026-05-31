@@ -1,8 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/shift_schedule.dart';
+import '../models/schedule_entry.dart';
+import '../models/schedule_category.dart';
 import '../models/alarm_setting.dart';
-import '../models/shift_type.dart';
+import 'category_manager.dart';
 
 class ScheduleManager {
   static final ScheduleManager _instance = ScheduleManager._internal();
@@ -20,24 +21,49 @@ class ScheduleManager {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'my_timer.db');
 
-    return await openDatabase(
+    final db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+
+    // CategoryManager에 DB 전달
+    CategoryManager().setDatabase(db);
+
+    // 기본 카테고리 삽입
+    await CategoryManager().insertDefaults(db);
+
+    return db;
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    // 카테고리 테이블
     await db.execute('''
-      CREATE TABLE shift_schedules (
+      CREATE TABLE categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL UNIQUE,
-        shift_type TEXT NOT NULL,
-        memo TEXT,
-        calendar_event_id TEXT
+        name TEXT NOT NULL,
+        emoji TEXT NOT NULL,
+        color INTEGER NOT NULL,
+        alarm_hour INTEGER NOT NULL DEFAULT 8,
+        alarm_minute INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
+    // 스케줄 항목 테이블 (카테고리 기반)
+    await db.execute('''
+      CREATE TABLE schedule_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL UNIQUE,
+        category_id INTEGER NOT NULL,
+        category_name TEXT NOT NULL,
+        memo TEXT,
+        calendar_event_id TEXT,
+        FOREIGN KEY (category_id) REFERENCES categories(id)
+      )
+    ''');
+
+    // 알람 설정 테이블
     await db.execute('''
       CREATE TABLE alarm_settings (
         alarm_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,54 +71,58 @@ class ScheduleManager {
         alarm_time TEXT NOT NULL,
         message TEXT NOT NULL,
         is_enabled INTEGER NOT NULL DEFAULT 1,
-        FOREIGN KEY (schedule_id) REFERENCES shift_schedules(id) ON DELETE CASCADE
+        FOREIGN KEY (schedule_id) REFERENCES schedule_entries(id) ON DELETE CASCADE
       )
     ''');
   }
 
-  // ── ShiftSchedule CRUD ──────────────────────────────────────────────
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // 기존 DB가 있을 경우 새 테이블 추가
+    await db.execute('DROP TABLE IF EXISTS schedule_entries');
+    await db.execute('DROP TABLE IF EXISTS alarm_settings');
+    await db.execute('DROP TABLE IF EXISTS categories');
+    await _onCreate(db, newVersion);
+  }
 
-  Future<int> insertSchedule(ShiftSchedule schedule) async {
+  // ── ScheduleEntry CRUD ──────────────────────────────────────────────
+
+  Future<int> insertEntry(ScheduleEntry entry) async {
     final db = await database;
     return await db.insert(
-      'shift_schedules',
-      schedule.toMap(),
+      'schedule_entries',
+      entry.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<void> updateSchedule(ShiftSchedule schedule) async {
+  Future<void> updateEntry(ScheduleEntry entry) async {
     final db = await database;
     await db.update(
-      'shift_schedules',
-      schedule.toMap(),
+      'schedule_entries',
+      entry.toMap(),
       where: 'id = ?',
-      whereArgs: [schedule.id],
+      whereArgs: [entry.id],
     );
   }
 
-  Future<void> deleteSchedule(int id) async {
+  Future<void> deleteEntry(int id) async {
     final db = await database;
-    await db.delete(
-      'shift_schedules',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('schedule_entries', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<ShiftSchedule?> getScheduleByDate(DateTime date) async {
+  Future<ScheduleEntry?> getEntryByDate(DateTime date) async {
     final db = await database;
     final dateStr = date.toIso8601String().substring(0, 10);
     final maps = await db.query(
-      'shift_schedules',
+      'schedule_entries',
       where: 'date = ?',
       whereArgs: [dateStr],
     );
     if (maps.isEmpty) return null;
-    return ShiftSchedule.fromMap(maps.first);
+    return ScheduleEntry.fromMap(maps.first);
   }
 
-  Future<List<ShiftSchedule>> getSchedulesByMonth(int year, int month) async {
+  Future<List<ScheduleEntry>> getEntriesByMonth(int year, int month) async {
     final db = await database;
     final startDate = '$year-${month.toString().padLeft(2, '0')}-01';
     final endDate = month < 12
@@ -100,37 +130,48 @@ class ScheduleManager {
         : '${year + 1}-01-01';
 
     final maps = await db.query(
-      'shift_schedules',
+      'schedule_entries',
       where: 'date >= ? AND date < ?',
       whereArgs: [startDate, endDate],
       orderBy: 'date ASC',
     );
-    return maps.map((m) => ShiftSchedule.fromMap(m)).toList();
+    return maps.map((m) => ScheduleEntry.fromMap(m)).toList();
   }
 
-  /// 반복 패턴 자동 적용 (예: 주야비휴 4일 순환)
+  /// 반복 패턴 적용
   Future<void> applyRepeatPattern(
-      DateTime startDate, List<ShiftType> pattern, int weeks) async {
+      DateTime startDate, List<ScheduleCategory> pattern, int weeks) async {
     final db = await database;
     final batch = db.batch();
     DateTime current = startDate;
     int idx = 0;
 
     for (int day = 0; day < weeks * 7; day++) {
-      final shiftType = pattern[idx % pattern.length];
-      final schedule = ShiftSchedule(
+      final cat = pattern[idx % pattern.length];
+      final entry = ScheduleEntry(
         date: current,
-        shiftType: shiftType,
+        categoryId: cat.id!,
+        categoryName: cat.name,
       );
       batch.insert(
-        'shift_schedules',
-        schedule.toMap(),
+        'schedule_entries',
+        entry.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       current = current.add(const Duration(days: 1));
       idx++;
     }
     await batch.commit(noResult: true);
+  }
+
+  Future<void> updateCalendarEventId(int entryId, String eventId) async {
+    final db = await database;
+    await db.update(
+      'schedule_entries',
+      {'calendar_event_id': eventId},
+      where: 'id = ?',
+      whereArgs: [entryId],
+    );
   }
 
   // ── AlarmSetting CRUD ───────────────────────────────────────────────
@@ -174,15 +215,5 @@ class ScheduleManager {
     final db = await database;
     final maps = await db.query('alarm_settings', orderBy: 'alarm_time ASC');
     return maps.map((m) => AlarmSetting.fromMap(m)).toList();
-  }
-
-  Future<void> updateCalendarEventId(int scheduleId, String eventId) async {
-    final db = await database;
-    await db.update(
-      'shift_schedules',
-      {'calendar_event_id': eventId},
-      where: 'id = ?',
-      whereArgs: [scheduleId],
-    );
   }
 }
