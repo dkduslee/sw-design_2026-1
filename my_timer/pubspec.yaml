@@ -1,0 +1,57 @@
+name: my_timer
+description: 3교대 근무자를 위한 알람·캘린더 연동 앱
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # 로컬 알람 및 푸시 알림
+  flutter_local_notifications: ^17.0.0
+
+  # 기기 캘린더 연동
+  device_calendar: ^4.3.2
+
+  # 로컬 SQLite DB
+  sqflite: ^2.3.0
+
+  # 앱 설정값 저장
+  shared_preferences: ^2.2.0
+
+  # 월간 캘린더 UI
+  table_calendar: ^3.1.0
+
+  # 런타임 권한 요청
+  permission_handler: ^11.0.0
+
+  # 상태 관리
+  provider: ^6.1.0
+
+  # 타임존 처리 (flutter_local_notifications 필요)
+  timezone: ^0.9.0
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
