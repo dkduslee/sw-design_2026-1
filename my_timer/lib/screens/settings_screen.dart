@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_settings.dart';
 import '../models/schedule_category.dart';
 import '../services/settings_service.dart';
@@ -59,7 +60,7 @@ class SettingsScreen extends StatelessWidget {
           // ── 카테고리별 기본 알람 시간 ────────────────────────────
           _sectionHeader('카테고리별 기본 알람 시간'),
           ...provider.categories.map(
-            (cat) => _buildCategoryAlarmTile(context, cat, service),
+            (cat) => _buildCategoryAlarmTile(context, cat, provider),
           ),
 
           const SizedBox(height: 32),
@@ -105,11 +106,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryAlarmTile(BuildContext context, ScheduleCategory cat,
-      SettingsService service) {
-    final settings = service.settings;
-    // 카테고리 ID 기반으로 커스텀 시간 조회
-    final key = 'alarm_time_${cat.id}';
-    // SharedPreferences에서 직접 읽는 대신 cat.alarmTime을 기본값으로 표시
+      ScheduleProvider provider) {
     final time = cat.alarmTime;
     final timeStr =
         '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
@@ -127,8 +124,11 @@ class SettingsScreen extends StatelessWidget {
             initialTime: time,
           );
           if (picked != null && context.mounted) {
-            // ShiftType 기반 저장 대신 카테고리 ID 기반으로 저장
-            // SettingsService 확장 필요 시 여기서 처리
+            final updated = cat.copyWith(alarmTime: picked);
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('alarm_time_${cat.id}', '${picked.hour}:${picked.minute}');
+            await provider.updateCategory(updated);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(

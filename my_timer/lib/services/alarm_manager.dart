@@ -36,7 +36,6 @@ class AppAlarmManager {
     debugPrint('Notification tapped: ${response.payload}');
   }
 
-  /// Android 12+ SCHEDULE_EXACT_ALARM 권한 요청
   Future<bool> requestExactAlarmPermission() async {
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -85,7 +84,6 @@ class AppAlarmManager {
       );
       debugPrint('등록완료');
     } catch (e) {
-      // 권한 없을 시 근사치 알람으로 재시도
       debugPrint('Exact alarm failed, trying inexact: $e');
       await _notifications.zonedSchedule(
         targetNotificationId,

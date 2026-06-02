@@ -10,35 +10,6 @@
 
 ---
 
-## 📁 프로젝트 구조
-
-```
-lib/
-├── main.dart                        # 앱 진입점 · 권한 요청 · Provider 설정
-├── models/
-│   ├── shift_type.dart              # ShiftType 열거형 (주간/야간/비번/휴무)
-│   ├── shift_schedule.dart          # ShiftSchedule 데이터 모델
-│   ├── alarm_setting.dart           # AlarmSetting 데이터 모델
-│   └── app_settings.dart            # AppSettings (SharedPreferences 래핑)
-├── services/
-│   ├── schedule_manager.dart        # SQLite CRUD (sqflite)
-│   ├── alarm_manager.dart           # OS 알람 등록/취소 (flutter_local_notifications)
-│   ├── calendar_manager.dart        # 기기 캘린더 연동 (device_calendar)
-│   ├── sync_service.dart            # 알람·캘린더 동기화 조율 + 롤백
-│   ├── settings_service.dart        # 앱 설정 저장·로드 (ChangeNotifier)
-│   └── schedule_provider.dart       # 스케줄 상태 관리 (ChangeNotifier)
-├── screens/
-│   ├── home_screen.dart             # 하단 네비게이션 진입점
-│   ├── calendar_screen.dart         # 메인 캘린더 화면
-│   ├── alarm_list_screen.dart       # 알람 목록 화면
-│   └── settings_screen.dart         # 설정 화면
-└── widgets/
-    ├── shift_dialog.dart            # 근무 유형 선택 다이얼로그
-    └── repeat_pattern_dialog.dart   # 반복 패턴 설정 다이얼로그
-```
-
----
-
 ## Android 권한 (AndroidManifest.xml)
 
 | 권한 | 용도 |
