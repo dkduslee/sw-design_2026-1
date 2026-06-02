@@ -77,14 +77,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             headerStyle: HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
-              // 연도/월 텍스트를 주황색 + 굵게
               titleTextStyle: const TextStyle(
                 color: Color(0xFFFF7043),
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
-              // 좌우 화살표 색상도 주황색으로
               leftChevronIcon: const Icon(
                 Icons.chevron_left_rounded,
                 color: Color(0xFFFF7043),
@@ -97,14 +95,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
               headerPadding: const EdgeInsets.symmetric(vertical: 12),
               decoration: const BoxDecoration(
-                color: Color(0xFFFFF3EF), // 연한 주황 배경
+                color: Color(0xFFFFF3EF),
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
               ),
             ),
             daysOfWeekStyle: const DaysOfWeekStyle(
-              // 요일 텍스트 스타일
               weekdayStyle: TextStyle(
                 color: Color(0xFF888888),
                 fontWeight: FontWeight.w600,
@@ -118,7 +115,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             calendarStyle: CalendarStyle(
               outsideDaysVisible: false,
-              // 오늘 날짜 강조
               todayDecoration: BoxDecoration(
                 color: const Color(0xFFFF7043).withOpacity(0.15),
                 shape: BoxShape.circle,
@@ -131,7 +127,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 color: Color(0xFFFF7043),
                 fontWeight: FontWeight.bold,
               ),
-              // 선택된 날짜
               selectedDecoration: const BoxDecoration(
                 color: Color(0xFFFF7043),
                 shape: BoxShape.circle,
@@ -143,7 +138,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
               weekendTextStyle: const TextStyle(
                 color: Color(0xFFFF7043),
               ),
-              // 셀 여백
               cellMargin: const EdgeInsets.all(4),
             ),
             locale: 'ko_KR',
@@ -161,7 +155,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       {bool isToday = false}) {
     final entry = provider.getEntry(day);
     final category =
-        entry != null ? provider.getCategoryById(entry.categoryId) : null;
+    entry != null ? provider.getCategoryById(entry.categoryId) : null;
     final color = category?.color;
     final isWeekend =
         day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
@@ -175,12 +169,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         shape: BoxShape.circle,
         boxShadow: isSelected
             ? [
-                BoxShadow(
-                  color: (color ?? const Color(0xFFFF7043)).withOpacity(0.35),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                )
-              ]
+          BoxShadow(
+            color: (color ?? const Color(0xFFFF7043)).withOpacity(0.35),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          )
+        ]
             : null,
       ),
       child: Column(
@@ -194,10 +188,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               color: isSelected
                   ? Colors.white
                   : color != null
-                      ? color
-                      : isWeekend
-                          ? const Color(0xFFFF7043)
-                          : const Color(0xFF444444),
+                  ? color
+                  : isWeekend
+                  ? const Color(0xFFFF7043)
+                  : const Color(0xFF444444),
             ),
           ),
           if (category != null)
@@ -214,39 +208,76 @@ class _CalendarScreenState extends State<CalendarScreen> {
       BuildContext context, DateTime day, ScheduleProvider provider) {
     final entry = provider.getEntry(day);
     final category =
-        entry != null ? provider.getCategoryById(entry.categoryId) : null;
+    entry != null ? provider.getCategoryById(entry.categoryId) : null;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       color: Theme.of(context)
           .colorScheme
           .surfaceVariant
           .withOpacity(0.3),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.event, size: 18),
-          const SizedBox(width: 8),
-          Text('${day.month}월 ${day.day}일 · '),
-          if (category != null)
-            Container(
-              padding:
+          Row(
+            children: [
+              const Icon(Icons.event, size: 18),
+              const SizedBox(width: 8),
+              Text('${day.month}월 ${day.day}일 · '),
+              if (category != null)
+                Container(
+                  padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: category.color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${category.emoji} ${category.name}',
+                    style: TextStyle(
+                      color: category.color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                )
+              else
+                Text('미등록',
+                    style: TextStyle(color: Colors.grey.shade500)),
+            ],
+          ),
+          if (entry != null && entry.memo != null && entry.memo!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: category.color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${category.emoji} ${category.name}',
-                style: TextStyle(
-                  color: category.color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                color: Colors.white.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.orangeAccent.shade200,
+                  width: 0.5,
                 ),
               ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.sticky_note_2_outlined,
+                      size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(entry.memo!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  ),
+                ],
+              ),
             )
-          else
-            Text('미등록',
-                style: TextStyle(color: Colors.grey.shade500)),
+          ],
         ],
       ),
     );
@@ -262,11 +293,41 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  Future<T?> _showAnimatedDialog<T>({
+    required BuildContext context,
+    required Widget child,
+  }) {
+    return showGeneralDialog<T>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withOpacity(0.4),
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, anim1, anim2) => child,
+      transitionBuilder: (context, anim1, anim2, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: anim1,
+          curve: Curves.easeOutCubic,
+        );
+        return FadeTransition(
+          opacity: anim1,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.12),
+              end: Offset.zero,
+            ).animate(curvedAnimation),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   void _showAddDialog(
       BuildContext context, DateTime day, ScheduleProvider provider) {
-    showDialog(
+    _showAnimatedDialog(
       context: context,
-      builder: (_) => ShiftDialog(
+      child: ShiftDialog(
         date: day,
         categories: provider.categories,
         onConfirm: (category, memo) async {
@@ -288,9 +349,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _showEditDeleteDialog(
       BuildContext context, ScheduleEntry entry, ScheduleProvider provider) {
     final category = provider.getCategoryById(entry.categoryId);
-    showDialog(
+    _showAnimatedDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      child: AlertDialog(
         title: Text(
             '${entry.date.month}월 ${entry.date.day}일 · ${category?.emoji ?? ''} ${entry.categoryName}'),
         content: const Text('일정을 수정하거나 삭제할 수 있습니다.'),
@@ -318,12 +379,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  // 3. 일정 수정 다이얼로그
   void _showEditDialog(
       BuildContext context, ScheduleEntry entry, ScheduleProvider provider) {
     final category = provider.getCategoryById(entry.categoryId);
-    showDialog(
+    _showAnimatedDialog(
       context: context,
-      builder: (_) => ShiftDialog(
+      child: ShiftDialog(
         date: entry.date,
         categories: provider.categories,
         initialCategory: category,
@@ -332,9 +394,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           await provider.editEntry(entry, newCategory, memo: memo);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(
-                      '${newCategory.emoji} ${newCategory.name}(으)로 변경되었습니다.')),
+              SnackBar(content: Text('${newCategory.emoji} ${newCategory.name}(으)로 변경되었습니다.')),
             );
           }
         },
@@ -342,11 +402,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  // 4. 일정 삭제 확인 다이얼로그
   void _showDeleteConfirm(
       BuildContext context, ScheduleEntry entry, ScheduleProvider provider) {
-    showDialog(
+    _showAnimatedDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      child: AlertDialog(
         title: const Text('일정 삭제'),
         content: Text(
             '${entry.date.month}월 ${entry.date.day}일 ${entry.categoryName} 일정을 삭제하시겠습니까?\n알람과 캘린더 이벤트도 함께 삭제됩니다.'),
@@ -364,8 +425,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 );
               }
             },
-            child: Text('삭제',
-                style: TextStyle(color: Colors.red.shade400)),
+            child: Text('삭제', style: TextStyle(color: Colors.red.shade400)),
           ),
         ],
       ),

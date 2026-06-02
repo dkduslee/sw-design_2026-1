@@ -8,7 +8,9 @@ import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AppAlarmManager().initialize();
+  final alarmManager = AppAlarmManager();
+  await alarmManager.initialize();
+  await alarmManager.requestExactAlarmPermission();
 
   runApp(
     MultiProvider(

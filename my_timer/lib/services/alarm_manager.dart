@@ -33,7 +33,6 @@ class AppAlarmManager {
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    // 알람 탭 시 처리 (필요 시 네비게이션 추가)
     debugPrint('Notification tapped: ${response.payload}');
   }
 
@@ -54,7 +53,8 @@ class AppAlarmManager {
     final now = DateTime.now();
     if (alarm.alarmTime.isBefore(now)) return; // 이미 지난 알람은 무시
 
-    const androidDetails = AndroidNotificationDetails(
+    final int targetNotificationId = alarm.alarmId ?? alarm.scheduleId;
+    final androidDetails = AndroidNotificationDetails(
       'my_timer_channel',
       'My Timer 알람',
       channelDescription: '근무 스케줄 알람 채널',
@@ -63,14 +63,17 @@ class AppAlarmManager {
       enableVibration: true,
       playSound: true,
       fullScreenIntent: true,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
+      category: AndroidNotificationCategory.alarm,
+      ongoing: true,
     );
-    const details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(android: androidDetails);
 
     final scheduledDate = tz.TZDateTime.from(alarm.alarmTime, tz.local);
 
     try {
       await _notifications.zonedSchedule(
-        alarm.alarmId ?? alarm.scheduleId,
+        targetNotificationId,
         'My Timer',
         alarm.message,
         scheduledDate,
@@ -80,11 +83,12 @@ class AppAlarmManager {
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: 'schedule_${alarm.scheduleId}',
       );
+      debugPrint('등록완료');
     } catch (e) {
       // 권한 없을 시 근사치 알람으로 재시도
       debugPrint('Exact alarm failed, trying inexact: $e');
       await _notifications.zonedSchedule(
-        alarm.alarmId ?? alarm.scheduleId,
+        targetNotificationId,
         'My Timer',
         alarm.message,
         scheduledDate,
